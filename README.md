@@ -9,7 +9,7 @@ O projeto segue uma arquitetura **MVVM (Model-View-ViewModel)**, utilizando a te
 3. **ViewModel**: Responsável pela lógica de negócio e comunicação com a API. O `ApiViewModel` realiza operações como buscar as faces cadastradas e enviar novas faces para o backend.
 4. **API**: A camada de API é implementada utilizando Retrofit, que facilita a comunicação com serviços REST. O `ApiService` define os endpoints disponíveis e como os dados serão enviados e recebidos da API.
 5. **Utils**: Um utilitário para lidar com certificados SSL inseguros está presente na classe `UnsafeOkHttpClient`, o que permite a comunicação com servidores que utilizam certificados SSL auto-assinados ou não validados (uso recomendado apenas em ambiente de desenvolvimento).
-6. **Components**: `AppBar` e `Header` componentes reutilizáveis 
+6. **Components**: `AppBar`, `Header` e `DropdownMenu` componentes reutilizáveis 
 
 ---
 
