@@ -255,7 +255,7 @@ fun DropdownMenu(
 ```
 ## 6.2 Header
 
-O arquivo `Header.kt` define um componente de cabeçalho reutilizável que inclui um título e um botão de menu. Ele é muito semelhante ao `AppBar`, mas foi separado como um componente reutilizável específico para ser usado em telas que requerem uma navegação mais simples.
+O arquivo `Header.kt` define um componente de cabeçalho reutilizável que inclui um título e um botão de menu. Foi separado como um componente reutilizável específico para ser usado em telas que requerem uma navegação mais simples.
 ```kotlin
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
