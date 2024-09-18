@@ -4,12 +4,12 @@
 
 O projeto segue uma arquitetura **MVVM (Model-View-ViewModel)**, utilizando a tecnologia  **Kotlin** junto com framework **Jetpack Compose** para a construção da interface de usuário e o Retrofit para a comunicação com a API. Abaixo, estão descritas as principais camadas e seus componentes:
 
-1. **Model**: Contém as classes que representam os dados manipulados no aplicativo, como `Face` e `PersonFace`. Esses modelos são utilizados para armazenar e transportar informações sobre as faces e suas características.
-2. **Screens**: Define as telas do aplicativo, como `HomeScreen` e `AddFaceScreen`. Elas utilizam os componentes do Jetpack Compose para renderizar a interface de usuário, solicitar interações e navegar entre telas.
-3. **ViewModel**: Responsável pela lógica de negócio e comunicação com a API. O `ApiViewModel` realiza operações como buscar as faces cadastradas e enviar novas faces para o backend.
-4. **API**: A camada de API é implementada utilizando Retrofit, que facilita a comunicação com serviços REST. O `ApiService` define os endpoints disponíveis e como os dados serão enviados e recebidos da API.
+1. **API**: A camada de API é implementada utilizando Retrofit, que facilita a comunicação com serviços REST. O `ApiService` define os endpoints disponíveis e como os dados serão enviados e recebidos da API.
+2. **Components**: `Header` e `DropdownMenu` componentes reutilizáveis 
+3. **Model**: Contém as classes que representam os dados manipulados no aplicativo, como `Face` e `PersonFace`. Esses modelos são utilizados para armazenar e transportar informações sobre as faces e suas características.
+4. **Screens**: Define as telas do aplicativo, como `HomeScreen` e `AddFaceScreen`. Elas utilizam os componentes do Jetpack Compose para renderizar a interface de usuário, solicitar interações e navegar entre telas.
 5. **Utils**: Um utilitário para lidar com certificados SSL inseguros está presente na classe `UnsafeOkHttpClient`, o que permite a comunicação com servidores que utilizam certificados SSL auto-assinados ou não validados (uso recomendado apenas em ambiente de desenvolvimento).
-6. **Components**: `AppBar`, `Header` e `DropdownMenu` componentes reutilizáveis 
+6. **ViewModel**: Responsável pela lógica de negócio e comunicação com a API. O `ApiViewModel` realiza operações como buscar as faces cadastradas e enviar novas faces para o backend.
 
 ---
 
@@ -205,54 +205,9 @@ private fun imageProxyToBitmap(image: ImageProxy): Bitmap {
 
 A camada de **components** contém componentes reutilizáveis que são usados nas telas do aplicativo para criar uma interface de usuário consistente. Esses componentes são projetados para serem independentes e reutilizáveis em diferentes partes da aplicação.
 
-### 6.1 AppBar
-O arquivo `AppBar.kt` define a barra de navegação superior, que inclui um título e um botão de menu. Esse componente é utilizado em várias telas do aplicativo para fornecer uma interface de navegação consistente.
+### 6.1 DropdownMenu
 
-```kotlin
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AppBar(navController: NavController, title: String) {
-    var expanded by remember { mutableStateOf(false) }
-
-    TopAppBar(
-        title = {
-            Text(
-                text = title,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
-        },
-        actions = {
-            Box {
-                IconButton(onClick = {
-                    expanded = !expanded
-                }) {
-                    Icon(
-                        Icons.Outlined.Menu,
-                        contentDescription = "Menu",
-                        tint = Color.White
-                    )
-                }
-                // Aqui o DropdownMenu é chamado
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = {
-                        expanded = false
-                    },
-                    navController = navController
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primary
-        )
-    )
-}
-
-```
-
-### 6.2 DropdownMenu
-
-O arquivo `DropdownMenu.kt` define o menu suspenso que é acionado na barra de navegação. Ele fornece opções de navegação adicionais, como "Faces" e "Cadastrar Face". Esse componente é exibido quando o botão de menu na AppBar é pressionado.
+O arquivo `DropdownMenu.kt` define o menu suspenso que é acionado na barra de navegação. Ele fornece opções de navegação adicionais, como "Faces" e "Cadastrar Face". Esse componente é exibido quando o botão de menu na IconButton, que se encontra dentro do menu `Header` é pressionado.
 ```kotlin
 @Composable
 fun DropdownMenu(
@@ -298,7 +253,7 @@ fun DropdownMenu(
 }
 
 ```
-## 6.3 Header
+## 6.2 Header
 
 O arquivo `Header.kt` define um componente de cabeçalho reutilizável que inclui um título e um botão de menu. Ele é muito semelhante ao `AppBar`, mas foi separado como um componente reutilizável específico para ser usado em telas que requerem uma navegação mais simples.
 ```kotlin
@@ -343,4 +298,4 @@ fun Header(navController: NavController, title: String) {
 
 ### Considerações finais
 
-A arquitetura MVVM utilizada separa bem a lógica de negócio da interface de usuário, facilitando a manutenção e evolução do código. O uso de componentes reutilizáveis, como `AppBar` e `Header`, também ajuda a manter a consistência visual e de navegação.
+A arquitetura MVVM utilizada separa bem a lógica de negócio da interface de usuário, facilitando a manutenção e evolução do código. O uso de componentes reutilizáveis, como `DropdownMenu` e `Header`, também ajuda a manter a consistência visual e de navegação.
