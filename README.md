@@ -10,6 +10,7 @@ O projeto segue uma arquitetura **MVVM (Model-View-ViewModel)**, utilizando a te
 4. **Screens**: Define as telas do aplicativo, como `HomeScreen` e `AddFaceScreen`. Elas utilizam os componentes do Jetpack Compose para renderizar a interface de usuário, solicitar interações e navegar entre telas.
 5. **Utils**: Um utilitário para lidar com certificados SSL inseguros está presente na classe `UnsafeOkHttpClient`, o que permite a comunicação com servidores que utilizam certificados SSL auto-assinados ou não validados (uso recomendado apenas em ambiente de desenvolvimento).
 6. **ViewModel**: Responsável pela lógica de negócio e comunicação com a API. O `ApiViewModel` realiza operações como buscar as faces cadastradas e enviar novas faces para o backend.
+7. **Navegação**: O arquivo AppNavHost.kt define o sistema de navegação do aplicativo, utilizando o Jetpack Navigation Compose. Ele controla o fluxo entre as diferentes telas do aplicativo, como HomeScreen, AddFaceScreen e VerifyScreen, além de gerenciar o estado da navegação utilizando o NavHostController e os parâmetros de rota definidos em AppScreen.
 
 ---
 
@@ -247,25 +248,212 @@ fun AddFaceScreen(navController: NavController, apiViewModel: ApiViewModel = Api
 
 A tela principal exibe a lista de faces cadastradas, utilizando um `LazyColumn` para carregar os dados de forma eficiente.
 
+<details>
+    <summary>Mostrar código</summary>
+    
 ```kotlin
 @Composable
 fun HomeScreen(navController: NavController, apiViewModel: ApiViewModel = ApiViewModel()) {
     var faces by remember { mutableStateOf(listOf<PersonFace>()) }
-    
-    Scaffold(topBar = { Header(navController = navController, title = "Faces") }) {
-        if (faces.isEmpty()) {
-            Text("Nenhuma face disponível no momento")
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) } // Controle de carregamento
+    var isDeleting by remember { mutableStateOf(false) } // Controle de exclusão
+    var showDeleteDialog by remember { mutableStateOf(false) } // Controla o diálogo de confirmação
+    var faceToDelete by remember { mutableStateOf<PersonFace?>(null) } // Face a ser deletada
+
+    LaunchedEffect(Unit) {
+        apiViewModel.fetchPersonFaces(
+            onSuccess = { fetchedFaces ->
+                errorMessage = null
+                faces = fetchedFaces
+                isLoading = false // Carregamento completo
+            },
+            onError = { error ->
+                errorMessage = error.message
+                isLoading = false // Carregamento completo mesmo com erro
+            }
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            Header(navController = navController, title = "Faces")  // Usando o header reutilizável
+        }
+    ) { paddingValues ->
+
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center // Centraliza o loading
+            ) {
+                CircularProgressIndicator() // Indicador de carregamento principal
+            }
         } else {
-            LazyColumn {
-                items(faces) { face ->
-                    PersonFaceItem(personFace = face)
+            if (errorMessage != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        modifier = Modifier.padding(16.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.elevatedCardElevation(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text(
+                            text = "Nenhuma face disponível no momento!",
+                            modifier = Modifier.padding(16.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else if (faces.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        modifier = Modifier.padding(16.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.elevatedCardElevation(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text(
+                            text = "Nenhuma face disponível no momento!",
+                            modifier = Modifier.padding(16.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(modifier = Modifier.padding(paddingValues)) {
+                    items(faces) { face ->
+                        PersonFaceItem(
+                            personFace = face,
+                            onDeleteClick = { faceToDeleteItem ->
+                                // Exibe o diálogo de confirmação antes de deletar
+                                faceToDelete = faceToDeleteItem
+                                showDeleteDialog = true
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Exibe o diálogo de confirmação
+            if (showDeleteDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteDialog = false },
+                    title = { Text(text = "Confirmação de Exclusão") },
+                    text = { Text(text = "Tem certeza que deseja excluir esta face?") },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showDeleteDialog = false
+                                isDeleting = true
+
+                                faceToDelete?.let { face ->
+                                    apiViewModel.deletePersonFace(
+                                        id = face.id,
+                                        onSuccess = {
+                                            faces = faces.filter { it.id != face.id }
+                                            isDeleting = false
+                                        },
+                                        onError = { error ->
+                                            errorMessage = "Erro ao excluir face: ${error.message}"
+                                            isDeleting = false
+                                        }
+                                    )
+                                }
+                            }
+                        ) {
+                            Text("Excluir")
+                        }
+                    },
+                    dismissButton = {
+                        Button(onClick = { showDeleteDialog = false }) {
+                            Text("Cancelar")
+                        }
+                    }
+                )
+            }
+
+            // Exibe o indicador de exclusão (loading) se estiver deletando
+            if (isDeleting) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator() // Indicador de carregamento para exclusão
                 }
             }
         }
     }
 }
 
+@Composable
+fun PersonFaceItem(
+    personFace: PersonFace,
+    onDeleteClick: (PersonFace) -> Unit
+) {
+    // Modern Card layout
+    Card(
+        modifier = Modifier
+            .padding(8.dp)
+            .fillMaxWidth(),
+        elevation = CardDefaults.elevatedCardElevation(6.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Exibe as informações da face
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "ID: ${personFace.id}",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Nome: ${personFace.name}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray
+                )
+            }
+
+            // Botão de deletar
+            IconButton(
+                onClick = { onDeleteClick(personFace) },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Sharp.Delete,
+                    contentDescription = "Excluir face",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+}
+
 ```
+</details>
 
 #### 3.3 VerifyScreen
 
@@ -449,19 +637,30 @@ class ApiViewModel : ViewModel() {
 Principais Funções:
 
 `fetchPersonFaces:` Busca as faces cadastradas no servidor e atualiza a UI.
-  
+      
   ```kotlin
    fun fetchPersonFaces(onSuccess: (List<PersonFace>) -> Unit, onError: (Throwable) -> Unit) {
         viewModelScope.launch {
             try {
+                Log.d("ApiViewModel", "Fazendo a requisição para a API...")
                 val faces = apiService.getPersonFaces()
-                onSuccess(faces)
+
+                if (faces.isNotEmpty()) {
+                    Log.d("ApiViewModel", "Faces recebidas: $faces")
+                    onSuccess(faces)
+                } else {
+                    Log.e("ApiViewModel", "Nenhuma face disponível")
+                    onError(Exception("Nenhuma face disponível"))
+                }
             } catch (e: Exception) {
+                Log.e("ApiViewModel", "Erro na requisição: ${e.message}", e)
                 onError(e)
             }
         }
     }
+       
   ```
+  
 `addPersonFace:` Envia uma imagem e nome para cadastrar uma nova face no backend.
   
    ```kotlin
@@ -579,15 +778,15 @@ Essa função converte um objeto `Bitmap` em um arquivo físico no sistema, o qu
 ```kotlin
 fun convertBitmapToFile(bitmap: Bitmap, file: File, quality: Int = 50): File {
     try {
-        FileOutputStream(file).use { outputStream ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
-        }
+        val fileOutputStream = FileOutputStream(file)
+        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, fileOutputStream)
+        fileOutputStream.flush()
+        fileOutputStream.close()
     } catch (e: IOException) {
         e.printStackTrace()
     }
     return file
 }
-
 
 ```
 
@@ -606,6 +805,7 @@ fun createTempFile(context: Context): File {
 
 ### 5.4 imageProxyToBitmap
 Essa função converte o objeto `ImageProxy` (retornado pela câmera) em um objeto `Bitmap`, que pode ser exibido na interface do usuário e enviado ao backend.
+
 ```kotlin
 private fun imageProxyToBitmap(image: ImageProxy): Bitmap {
     val buffer: ByteBuffer = image.planes[0].buffer
@@ -613,10 +813,109 @@ private fun imageProxyToBitmap(image: ImageProxy): Bitmap {
     buffer.get(bytes)
     return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
 }
-
-
 ```
-## 6. Components
+
+### 5.5 CameraPreviewView
+A função `CameraPreviewView` é uma composable do Jetpack Compose que exibe a visualização da câmera frontal e permite capturar uma imagem. Ela utiliza o `PreviewView` para exibir a pré-visualização da câmera e o `ImageCapture` para tirar a foto. O ciclo de vida da câmera é vinculado ao ciclo de vida da interface utilizando o `ProcessCameraProvider`. Quando o usuário clica no botão "Capturar Face", a imagem capturada é convertida em um `Bitmap` e passada para o `callback` fornecido, permitindo o processamento posterior da imagem.
+
+```kotlin
+@Composable
+fun CameraPreviewView(modifier: Modifier = Modifier, onImageCaptured: (Bitmap) -> Unit) {
+    val context = LocalContext.current
+    val lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current
+
+    val previewView = PreviewView(context)
+    val imageCapture = ImageCapture.Builder().build()
+    val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+
+    LaunchedEffect(Unit) {
+        val cameraProvider = cameraProviderFuture.get()
+        val preview = androidx.camera.core.Preview.Builder().build().also {
+            it.setSurfaceProvider(previewView.surfaceProvider)
+        }
+
+        try {
+            cameraProvider.unbindAll()
+            cameraProvider.bindToLifecycle(
+                lifecycleOwner,
+                CameraSelector.DEFAULT_FRONT_CAMERA,
+                preview,
+                imageCapture
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    AndroidView(
+        factory = { previewView },
+        modifier = modifier
+    )
+
+    Button(
+        onClick = {
+            imageCapture.takePicture(
+                ContextCompat.getMainExecutor(context),
+                object : ImageCapture.OnImageCapturedCallback() {
+                    override fun onCaptureSuccess(image: ImageProxy) {
+                        val bitmap = imageProxyToBitmap(image)
+                        onImageCaptured(bitmap)
+                        image.close()
+                    }
+
+                    override fun onError(exception: ImageCaptureException) {
+                        println("Erro ao capturar imagem: ${exception.message}")
+                    }
+                }
+            )
+        },
+        modifier = Modifier.padding(top = 16.dp)
+    ) {
+        Text("Capturar Face")
+    }
+}
+```
+
+### 5.6 getBitmapFromUri
+A função `getBitmapFromUri` converte um `Uri` em um objeto `Bitmap` a partir de um recurso de imagem, utilizando o `ContentResolver` para acessar o arquivo. Ela recebe um `Uri`, o contexto da aplicação, e os valores de largura e altura máximos. Após decodificar a imagem original, a função redimensiona o `Bitmap` para se ajustar aos limites fornecidos, utilizando a função auxiliar `resizeBitmap`. Caso o Bitmap original seja nulo, a função retorna null.
+
+```kotlin
+fun getBitmapFromUri(uri: Uri, context: Context, maxWidth: Int, maxHeight: Int): Bitmap? {
+    val inputStream = context.contentResolver.openInputStream(uri)
+    val originalBitmap = BitmapFactory.decodeStream(inputStream)
+    inputStream?.close()
+
+    return originalBitmap?.let {
+        resizeBitmap(it, maxWidth, maxHeight)
+    }
+}
+```
+
+### 5.7 resizeBitmap
+A função `resizeBitmap` redimensiona um `Bitmap` original mantendo sua proporção de aspecto. Ela recebe o `Bitmap` original, uma largura e uma altura máximas. A função calcula a nova largura e altura com base no aspecto da imagem, ajustando a maior dimensão ao limite máximo permitido e escalando a outra dimensão proporcionalmente. O Bitmap redimensionado é retornado usando a função Bitmap.createScaledBitmap, preservando a qualidade da imagem.
+
+```kotlin
+fun resizeBitmap(original: Bitmap, maxWidth: Int, maxHeight: Int): Bitmap {
+    val width = original.width
+    val height = original.height
+
+    val aspectRatio: Float = width.toFloat() / height.toFloat()
+    val newWidth: Int
+    val newHeight: Int
+
+    if (width > height) {
+        newWidth = maxWidth
+        newHeight = (newWidth / aspectRatio).toInt()
+    } else {
+        newHeight = maxHeight
+        newWidth = (newHeight * aspectRatio).toInt()
+    }
+
+    return Bitmap.createScaledBitmap(original, newWidth, newHeight, true)
+}
+```
+
+## 6. Components 
 
 A camada de **components** contém componentes reutilizáveis que são usados nas telas do aplicativo para criar uma interface de usuário consistente. Esses componentes são projetados para serem independentes e reutilizáveis em diferentes partes da aplicação.
 
@@ -627,7 +926,6 @@ O arquivo `DropdownMenu.kt` define o menu suspenso que é acionado na barra de n
 @Composable
 fun DropdownMenu(
     navController: NavController,
-    modifier: Modifier = Modifier,
     expanded: Boolean,
     onDismissRequest: () -> Unit,
 ) {
@@ -639,14 +937,14 @@ fun DropdownMenu(
                 text = { Text(text = "Faces") },
                 leadingIcon = {
                     Icon(
-                        imageVector = Icons.Outlined.Home,
+                        imageVector = Icons.Outlined.Person,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 },
                 onClick = {
-                    navController.navigate(AppScreen.Home.route)
-                    onDismissRequest() // Fecha o menu
+                    navController.navigate(AppScreen.HomeScreen.route)
+                    onDismissRequest()
                 }
             )
             DropdownMenuItem(
@@ -659,14 +957,27 @@ fun DropdownMenu(
                     )
                 },
                 onClick = {
-                    navController.navigate(AppScreen.AnotherScreen.route)
-                    onDismissRequest() // Fecha o menu
+                    navController.navigate(AppScreen.AddFaceScreen.route)
+                    onDismissRequest()
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(text = "Verificar Face") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.AccountBox,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                onClick = {
+                    navController.navigate(AppScreen.VerifyScreen.route)
+                    onDismissRequest()
                 }
             )
         }
     )
 }
-
 ```
 ## 6.2 Header
 
