@@ -11,10 +11,12 @@ O projeto segue uma arquitetura **MVVM (Model-View-ViewModel)**, utilizando a te
 5. **Utils**: Um utilitário para lidar com certificados SSL inseguros está presente na classe `UnsafeOkHttpClient`, o que permite a comunicação com servidores que utilizam certificados SSL auto-assinados ou não validados (uso recomendado apenas em ambiente de desenvolvimento).
 6. **ViewModel**: Responsável pela lógica de negócio e comunicação com a API. O `ApiViewModel` realiza operações como buscar as faces cadastradas e enviar novas faces para o backend.
 7. **Navegação**: O arquivo AppNavHost.kt define o sistema de navegação do aplicativo, utilizando o Jetpack Navigation Compose. Ele controla o fluxo entre as diferentes telas do aplicativo, como HomeScreen, AddFaceScreen e VerifyScreen, além de gerenciar o estado da navegação utilizando o NavHostController e os parâmetros de rota definidos em AppScreen.
+8. **Rotas**: O arquivo AppScreen.kt contém uma classe selada que define as rotas de navegação no aplicativo. Cada tela é representada como um objeto dentro de AppScreen, que armazena tanto a rota quanto o título correspondente, permitindo uma navegação clara e organizada entre as diferentes partes da aplicação.
+9. **Atividade Principal**: O arquivo MainActivity.kt contém a atividade principal do aplicativo, onde o tema é configurado e o sistema de navegação é inicializado. A MainActivity também é responsável por instanciar e fornecer o ApiViewModel para gerenciar a lógica de comunicação com a API ao longo das telas. O Scaffold é utilizado para controlar o layout principal do aplicativo.
 
 ---
 
-### 1. API Service
+## 1. API Service
 
 O `ApiService.kt` define dois endpoints:
 
@@ -49,7 +51,7 @@ interface ApiService {
     ): Response<ResponseBody>
 }
 ```
-### 2. Model
+## 2. Model
 
 Os modelos são simples e diretos, representando as entidades necessárias para a aplicação:
 - `Face`: representa uma face com um ID, nome e URL da imagem.
@@ -69,9 +71,9 @@ data class DeleteFaceResponse (val total: Int)
 data class VerifyPersonFace(val name: String, val image: MultipartBody.Part)
 ```
 
-### 3. Screens - Interface de Usuário
+## 3. Screens - Interface de Usuário
 
-#### 3.1 AddFaceScreen
+### 3.1 AddFaceScreen
 
 A tela `AddFaceScreen` permite que o usuário capture uma imagem usando a câmera e faça o cadastro dessa face no sistema. Utiliza o `CameraX` para captura de imagens
 
@@ -244,7 +246,7 @@ fun AddFaceScreen(navController: NavController, apiViewModel: ApiViewModel = Api
 ```
 </details>
 
-#### 3.2 HomeScreen
+### 3.2 HomeScreen
 
 A tela principal exibe a lista de faces cadastradas, utilizando um `LazyColumn` para carregar os dados de forma eficiente.
 
@@ -455,7 +457,7 @@ fun PersonFaceItem(
 ```
 </details>
 
-#### 3.3 VerifyScreen
+### 3.3 VerifyScreen
 
 Exibe um campo de entrada para o nome da face, um botão para selecionar a imagem da galeria e um botão para submeter para a api.
 
@@ -979,7 +981,7 @@ fun DropdownMenu(
     )
 }
 ```
-## 6.2 Header
+### 6.2 Header
 
 O arquivo `Header.kt` define um componente de cabeçalho reutilizável que inclui um título e um botão de menu. Foi separado como um componente reutilizável específico para ser usado em telas que requerem uma navegação mais simples.
 ```kotlin
@@ -1020,8 +1022,76 @@ fun Header(navController: NavController, title: String) {
 }
 
 ```
+## 7. Navegação (raiz do projeto)
 
+### 7.1 AppNavHost.kt
+Define o fluxo e estado de navegação do aplicativo entre a telas utilizando o `Jetpack Navigation Compose`
+
+```kotlin
+@Composable
+fun AppNavHost(navController: NavHostController, modifier: Modifier = Modifier, apiViewModel: ApiViewModel) {
+
+    NavHost(navController = navController, startDestination = AppScreen.HomeScreen.route, modifier = modifier) {
+
+        composable(AppScreen.HomeScreen.route) {
+            HomeScreen(navController, apiViewModel)
+        }
+
+        composable(AppScreen.AddFaceScreen.route) {
+            AddFaceScreen(navController)
+        }
+
+        composable(AppScreen.VerifyScreen.route) {
+            VerifyScreen(navController)
+        }
+
+    }
+
+}
+```
+## 8. Rotas (raiz do projeto)
+
+### 8.1 AppScreen
+Define a rotas de navegação do aplicativo em uma classe selada `sealed`. As telas são representadas como um objeto dentro de AppScreen, que armazena tanto a rota quanto o título correspondente.
+
+```kotlin
+sealed class AppScreen(val route: String, val title: String) {
+    data object HomeScreen : AppScreen(route = "home", title = "Home")
+    data object AddFaceScreen : AppScreen(route = "addpersonface", title = "Cadastrar Face")
+    data object VerifyScreen : AppScreen(route = "verify", title = "Verificar Face")
+}
+```
+## 9. Atividade principal (raiz do projeto)
+
+### 9.1 MainActivity.kt
+A camada principal do aplicativo, onde o tema é configurado e o sistema de navegação é inicializado. A MainActivity também é responsável por instanciar e fornecer o ApiViewModel para gerenciar a lógica de comunicação com o serviço externo `API`, o Scaffold é utilizado para controlar o layout.
+
+```kotlin
+class MainActivity : ComponentActivity() {
+
+    private val apiViewModel: ApiViewModel by viewModels()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        setContent {
+            DemoT4FaceTheme {
+                val navController = rememberNavController()
+
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                    AppNavHost(
+                        navController = navController,
+                        modifier = Modifier.padding(innerPadding),
+                        apiViewModel = apiViewModel
+                    )
+                }
+            }
+        }
+    }
+}
+
+```
 
 ### Considerações finais
 
-A arquitetura MVVM utilizada separa bem a lógica de negócio da interface de usuário, facilitando a manutenção e evolução do código. O uso de componentes reutilizáveis, como `DropdownMenu` e `Header`, também ajuda a manter a consistência visual e de navegação.
+A arquitetura MVVM `Model-View-ViewModel` utilizada, separa bem a lógica de negócio da interface de usuário, facilitando a manutenção e evolução do código. O uso de componentes reutilizáveis, como `DropdownMenu` e `Header`, também ajuda a manter a consistência visual e de navegação.
